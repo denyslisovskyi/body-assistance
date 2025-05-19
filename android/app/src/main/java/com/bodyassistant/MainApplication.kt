@@ -40,11 +40,5 @@ class MainApplication : Application(), ReactApplication {
       // If you opted-in for the New Architecture, we load the native entry point for this app.
       load()
     }
-
-    // Реєстрація лише плагінів для обробки кадрів
-    FrameProcessorPluginRegistry.addFrameProcessorPlugin(
-      "getJpegFrame",
-      JpegFrameProcessorPlugin()
-    )
   }
 }

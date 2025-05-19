@@ -1,8 +1,9 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {View, StyleSheet} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {View, StyleSheet, Button, Text} from 'react-native';
 import {Camera, useCameraDevice} from 'react-native-vision-camera';
 import {
   Canvas,
+  useCanvasRef,
   Image as SkiaImage,
   useImage,
   SkImage,
@@ -10,42 +11,62 @@ import {
 
 export const CameraView = () => {
   const device = useCameraDevice('back');
+  const [hasPermission, setHasPermission] = useState(false);
   const [frame, setFrame] = useState<SkImage | null>(null);
-  const cameraRef = useRef<Camera>(null);
 
-  // Поки що ми просто завантажимо картинку з assets, щоб протестити Skia
-  const testImage = useImage(require('../assets/test.jpg'));
+  const canvasRef = useCanvasRef();
 
   useEffect(() => {
-    if (testImage) {
-      setFrame(testImage);
-    }
-  }, [testImage]);
+    const requestPermissions = async () => {
+      const status = await Camera.requestCameraPermission();
+      setHasPermission(status === 'granted');
+    };
 
-  if (!device) return null;
+    requestPermissions();
+  }, []);
+
+  const testImage = useImage(require('../assets/test.jpg'));
+
+  //   useEffect(() => {
+  //     if (testImage) {
+  //       setFrame(testImage);
+  //     }
+  //   }, [testImage]);
+
+  const handleCapture = () => {
+    const snapshot = canvasRef.current?.makeImageSnapshot();
+    const bytes = snapshot?.encodeToBytes(); // Uint8Array (PNG by default)
+
+    if (bytes) {
+      console.log('Captured frame bytes:', bytes);
+      console.log('Byte length:', bytes.length);
+      // Тут у наступному кроці будемо передавати в TensorFlow
+    } else {
+      console.warn('Failed to capture snapshot');
+    }
+  };
+
+  if (!device || !hasPermission) {
+    return <Text>Loading or no permission</Text>;
+  }
 
   return (
     <View style={styles.container}>
-      <Camera
-        ref={cameraRef}
-        style={styles.camera}
-        device={device}
-        isActive={true}
-      />
+      <Camera style={styles.camera} device={device} isActive={true} />
 
-      <Canvas style={styles.canvas}>
+      <Canvas ref={canvasRef} style={styles.canvas}>
         {frame && (
           <SkiaImage image={frame} x={0} y={0} width={300} height={400} />
         )}
       </Canvas>
+
+      <Button title="СДЕЛАТЬ ФОТО" onPress={handleCapture} />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: {flex: 1},
   camera: {
     flex: 1,
     position: 'absolute',

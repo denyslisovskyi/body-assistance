@@ -8,12 +8,17 @@ import {
   useImage,
   SkImage,
 } from '@shopify/react-native-skia';
+import * as tf from '@tensorflow/tfjs';
+import '@tensorflow/tfjs-react-native';
+import {PNG} from 'pngjs/browser';
+import {Buffer} from 'buffer';
+
+global.Buffer = Buffer; // 👈 потрібно для pngjs
 
 export const CameraView = () => {
   const device = useCameraDevice('back');
   const [hasPermission, setHasPermission] = useState(false);
   const [frame, setFrame] = useState<SkImage | null>(null);
-
   const canvasRef = useCanvasRef();
 
   useEffect(() => {
@@ -22,28 +27,44 @@ export const CameraView = () => {
       setHasPermission(status === 'granted');
     };
 
+    const prepareTF = async () => {
+      await tf.ready();
+      console.log('✅ TensorFlow ready');
+    };
+
     requestPermissions();
+    prepareTF();
   }, []);
 
   const testImage = useImage(require('../assets/test.jpg'));
 
-  //   useEffect(() => {
-  //     if (testImage) {
-  //       setFrame(testImage);
-  //     }
-  //   }, [testImage]);
-
-  const handleCapture = () => {
-    const snapshot = canvasRef.current?.makeImageSnapshot();
-    const bytes = snapshot?.encodeToBytes(); // Uint8Array (PNG by default)
-
-    if (bytes) {
-      console.log('Captured frame bytes:', bytes);
-      console.log('Byte length:', bytes.length);
-      // Тут у наступному кроці будемо передавати в TensorFlow
-    } else {
-      console.warn('Failed to capture snapshot');
+  useEffect(() => {
+    if (testImage) {
+      setFrame(testImage);
     }
+  }, [testImage]);
+
+  const handleCapture = async () => {
+    const snapshot = canvasRef.current?.makeImageSnapshot();
+    const bytes = snapshot?.encodeToBytes(); // PNG by default
+
+    if (!bytes) {
+      console.warn('❌ No snapshot bytes');
+      return;
+    }
+
+    console.log('Captured PNG bytes:', bytes.length);
+
+    // Decode PNG → RGBA
+    const png = PNG.sync.read(Buffer.from(bytes));
+    const {width, height, data} = png;
+
+    console.log('✅ Decoded PNG:', {width, height, byteLength: data.length});
+
+    // Create Tensor
+    const imageTensor = tf.browser.fromPixels({data, width, height}, 3); // RGB
+
+    console.log('✅ Tensor shape:', imageTensor.shape); // Should be [height, width, 3]
   };
 
   if (!device || !hasPermission) {
@@ -60,7 +81,7 @@ export const CameraView = () => {
         )}
       </Canvas>
 
-      <Button title="СДЕЛАТЬ ФОТО" onPress={handleCapture} />
+      <Button title="📸 Снять кадр и создать Tensor" onPress={handleCapture} />
     </View>
   );
 };

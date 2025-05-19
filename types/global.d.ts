@@ -1,1 +1,4 @@
-declare function getJpegFrame(frame: any): any;
+declare module 'pngjs/browser' {
+  import {PNG} from 'pngjs';
+  export {PNG};
+}
